@@ -1,7 +1,7 @@
 local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/tbao143/Library-ui/refs/heads/main/Redzhubui"))()
 
 local Window = redzlib:MakeWindow({
-    Title = "goon hub | grow a dih",
+    Title = "goon hub | 99 gozadas",
     SubTitle = "feito por urubu do pix",
     SaveFolder = "gugudada.lua"
 })
