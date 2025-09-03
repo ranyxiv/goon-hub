@@ -1,1 +1,2 @@
-# goon-hub
+feito por um noob
+nao julgue
