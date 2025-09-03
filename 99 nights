@@ -112,62 +112,13 @@ Tab2:AddButton({
     end
 })
 
--- ==================================================
--- TAB 3 - TP DINÂMICO
--- ==================================================
-local Tab3 = Window:MakeTab({"TP Criado", "Dynamic"})
-local createdTPButtons = {}
-local createdTPCoords = {}
-local tpCoordInput = nil
 
-Tab3:AddTextBox({
-    Name = "Digite Coordenada",
-    Description = "Formato: x,y,z",
-    PlaceholderText = "Ex: 10,5,30",
-    Callback = function(Value)
-        local x, y, z = string.match(Value, "([^,]+),([^,]+),([^,]+)")
-        if x and y and z then
-            tpCoordInput = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
-        else
-            tpCoordInput = nil
-            warn("Formato inválido! Use x,y,z")
-        end
-    end
-})
 
-Tab3:AddButton({
-    Name = "Criar TP",
-    Callback = function()
-        if not tpCoordInput then
-            warn("Nenhuma coordenada válida para criar TP!")
-            return
-        end
-
-        local key = tostring(math.floor(tpCoordInput.X))..","..tostring(math.floor(tpCoordInput.Y))..","..tostring(math.floor(tpCoordInput.Z))
-        if createdTPCoords[key] then
-            warn("Essa coordenada já possui um botão!")
-            return
-        end
-
-        local btn = Tab3:AddButton({
-            Name = "TP para " .. key,
-            Callback = function()
-                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    player.Character.HumanoidRootPart.CFrame = CFrame.new(tpCoordInput)
-                    print("Teleportado para:", tpCoordInput)
-                end
-            end
-        })
-
-        createdTPCoords[key] = true
-        table.insert(createdTPButtons, btn)
-    end
-})
 
 -- ==================================================
 -- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s)
 -- ==================================================
-local Tab4 = Window:MakeTab({"Chests", "Farm"})
+local Tab4 = Window:MakeTab({"baús", "Farm"})
 local chestButtons = {}
 
 local function encontrarChests()
@@ -176,9 +127,9 @@ local function encontrarChests()
 
     local chestNames = {
         ["Item Chest"] = "Baú Normal",
-        ["Item Chest2"] = "Baú de Prata",
-        ["Item Chest3"] = "Baú de Ouro",
-        ["Item Chest4"] = "Baú de Rubi"
+        ["Item Chest2"] = "Baú de ferro",
+        ["Item Chest3"] = "Baú de prata",
+        ["Item Chest4"] = "Baú de ouro"
     }
 
     if itemsFolder then
