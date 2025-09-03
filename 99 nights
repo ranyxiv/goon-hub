@@ -118,7 +118,7 @@ Tab2:AddButton({
 -- ==================================================
 -- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s)
 -- ==================================================
-local Tab4 = Window:MakeTab({"baús", "Farm"})
+local Tab4 = Window:MakeTab({"baús", "map"})
 local chestButtons = {}
 
 local function encontrarChests()
