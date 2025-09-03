@@ -25,7 +25,7 @@ local currentSpeed = 16
 -- ==================================================
 local Tab1 = Window:MakeTab({"Player", "Cherry"})
 
--- INF JUMP
+-- Infinite Jump
 Tab1:AddToggle({
     Name = "Infinite Jump",
     Default = false,
@@ -41,7 +41,7 @@ uis.JumpRequest:Connect(function()
     end
 end)
 
--- SPEED
+-- WalkSpeed
 local function applySpeed(humanoid)
     if humanoid and humanoid:IsA("Humanoid") then
         humanoid.WalkSpeed = currentSpeed
@@ -59,18 +59,26 @@ end
 
 Tab1:AddSlider({
     Name = "Speed",
-    Min = 1,
+    Min = 20,
     Max = 100,
     Increase = 1,
-    Default = 16,
+    Default = 20,
     Callback = function(Value)
         currentSpeed = math.clamp(tonumber(Value) or 16, 1, 100)
-        local h = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if h then h.WalkSpeed = currentSpeed end
     end
 })
 
--- NOCLIP
+-- Força a velocidade sempre
+runService.Stepped:Connect(function()
+    if player.Character then
+        local h = player.Character:FindFirstChildOfClass("Humanoid")
+        if h and h.WalkSpeed ~= currentSpeed then
+            h.WalkSpeed = currentSpeed
+        end
+    end
+end)
+
+-- NoClip
 runService.Stepped:Connect(function()
     if noclip and player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -109,10 +117,9 @@ Tab2:AddButton({
 -- ==================================================
 local Tab3 = Window:MakeTab({"TP Criado", "Dynamic"})
 local createdTPButtons = {}
-local createdTPCoords = {} -- tabela para evitar duplicatas
+local createdTPCoords = {}
 local tpCoordInput = nil
 
--- TextBox pra digitar coordenadas
 Tab3:AddTextBox({
     Name = "Digite Coordenada",
     Description = "Formato: x,y,z",
@@ -128,7 +135,6 @@ Tab3:AddTextBox({
     end
 })
 
--- Botão para criar TP
 Tab3:AddButton({
     Name = "Criar TP",
     Callback = function()
@@ -137,14 +143,12 @@ Tab3:AddButton({
             return
         end
 
-        -- verifica se a coordenada já foi adicionada
         local key = tostring(math.floor(tpCoordInput.X))..","..tostring(math.floor(tpCoordInput.Y))..","..tostring(math.floor(tpCoordInput.Z))
         if createdTPCoords[key] then
             warn("Essa coordenada já possui um botão!")
             return
         end
 
-        -- cria o botão dinamicamente
         local btn = Tab3:AddButton({
             Name = "TP para " .. key,
             Callback = function()
@@ -155,8 +159,73 @@ Tab3:AddButton({
             end
         })
 
-        -- marca a coordenada como criada
         createdTPCoords[key] = true
         table.insert(createdTPButtons, btn)
     end
 })
+
+-- ==================================================
+-- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s)
+-- ==================================================
+local Tab4 = Window:MakeTab({"Chests", "Farm"})
+local chestButtons = {}
+
+local function encontrarChests()
+    local chests = {}
+    local itemsFolder = workspace:FindFirstChild("Items")
+
+    local chestNames = {
+        ["Item Chest"] = "Baú Normal",
+        ["Item Chest2"] = "Baú de Prata",
+        ["Item Chest3"] = "Baú de Ouro",
+        ["Item Chest4"] = "Baú de Rubi"
+    }
+
+    if itemsFolder then
+        for _, item in pairs(itemsFolder:GetChildren()) do
+            if chestNames[item.Name] then
+                local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    table.insert(chests, {
+                        Nome = chestNames[item.Name],
+                        Posicao = part.Position
+                    })
+                end
+            end
+        end
+    end
+
+    return chests
+end
+
+local function teleportarParaPosicao(posicao)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(posicao + Vector3.new(0, 3, 0))
+    end
+end
+
+local function atualizarChests()
+    for _, btn in pairs(chestButtons) do
+        btn:Remove()
+    end
+    chestButtons = {}
+
+    local chests = encontrarChests()
+
+    for _, chest in ipairs(chests) do
+        local btn = Tab4:AddButton({
+            Name = chest.Nome,
+            Callback = function()
+                teleportarParaPosicao(chest.Posicao)
+            end
+        })
+        table.insert(chestButtons, btn)
+    end
+end
+
+task.spawn(function()
+    while true do
+        atualizarChests()
+        task.wait(0.5)
+    end
+end)
