@@ -1,0 +1,162 @@
+local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/tbao143/Library-ui/refs/heads/main/Redzhubui"))()
+
+local Window = redzlib:MakeWindow({
+    Title = "goon hub | grow a dih",
+    SubTitle = "feito por urubu do pix",
+    SaveFolder = "gugudada.lua"
+})
+
+Window:AddMinimizeButton({
+    Button = { Image = "rbxassetid://71014873973869", BackgroundTransparency = 0 },
+    Corner = { CornerRadius = UDim.new(35, 1) },
+})
+
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+
+-- Variáveis globais
+local infJumpEnabled = false
+local noclip = false
+local currentSpeed = 16
+
+-- ==================================================
+-- TAB 1 - PLAYER
+-- ==================================================
+local Tab1 = Window:MakeTab({"Player", "Cherry"})
+
+-- INF JUMP
+Tab1:AddToggle({
+    Name = "Infinite Jump",
+    Default = false,
+    Callback = function(v)
+        infJumpEnabled = v
+    end
+})
+
+uis.JumpRequest:Connect(function()
+    if infJumpEnabled then
+        local h = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+-- SPEED
+local function applySpeed(humanoid)
+    if humanoid and humanoid:IsA("Humanoid") then
+        humanoid.WalkSpeed = currentSpeed
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    local h = char:WaitForChild("Humanoid", 5)
+    applySpeed(h)
+end)
+
+if player.Character then
+    applySpeed(player.Character:FindFirstChildOfClass("Humanoid"))
+end
+
+Tab1:AddSlider({
+    Name = "Speed",
+    Min = 1,
+    Max = 100,
+    Increase = 1,
+    Default = 16,
+    Callback = function(Value)
+        currentSpeed = math.clamp(tonumber(Value) or 16, 1, 100)
+        local h = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = currentSpeed end
+    end
+})
+
+-- NOCLIP
+runService.Stepped:Connect(function()
+    if noclip and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+Tab1:AddToggle({
+    Name = "NoClip",
+    Default = false,
+    Callback = function(v)
+        noclip = v
+    end
+})
+
+-- ==================================================
+-- TAB 2 - TELEPORT FIXO
+-- ==================================================
+local Tab2 = Window:MakeTab({"Teleport", "Map"})
+
+Tab2:AddButton({
+    Name = "TP para o Fogo",
+    Callback = function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,0,0))
+            print("Teleportado para o Fogo: 0,0,0")
+        end
+    end
+})
+
+-- ==================================================
+-- TAB 3 - TP DINÂMICO
+-- ==================================================
+local Tab3 = Window:MakeTab({"TP Criado", "Dynamic"})
+local createdTPButtons = {}
+local createdTPCoords = {} -- tabela para evitar duplicatas
+local tpCoordInput = nil
+
+-- TextBox pra digitar coordenadas
+Tab3:AddTextBox({
+    Name = "Digite Coordenada",
+    Description = "Formato: x,y,z",
+    PlaceholderText = "Ex: 10,5,30",
+    Callback = function(Value)
+        local x, y, z = string.match(Value, "([^,]+),([^,]+),([^,]+)")
+        if x and y and z then
+            tpCoordInput = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+        else
+            tpCoordInput = nil
+            warn("Formato inválido! Use x,y,z")
+        end
+    end
+})
+
+-- Botão para criar TP
+Tab3:AddButton({
+    Name = "Criar TP",
+    Callback = function()
+        if not tpCoordInput then
+            warn("Nenhuma coordenada válida para criar TP!")
+            return
+        end
+
+        -- verifica se a coordenada já foi adicionada
+        local key = tostring(math.floor(tpCoordInput.X))..","..tostring(math.floor(tpCoordInput.Y))..","..tostring(math.floor(tpCoordInput.Z))
+        if createdTPCoords[key] then
+            warn("Essa coordenada já possui um botão!")
+            return
+        end
+
+        -- cria o botão dinamicamente
+        local btn = Tab3:AddButton({
+            Name = "TP para " .. key,
+            Callback = function()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character.HumanoidRootPart.CFrame = CFrame.new(tpCoordInput)
+                    print("Teleportado para:", tpCoordInput)
+                end
+            end
+        })
+
+        -- marca a coordenada como criada
+        createdTPCoords[key] = true
+        table.insert(createdTPButtons, btn)
+    end
+})
