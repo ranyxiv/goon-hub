@@ -112,35 +112,41 @@ Tab2:AddButton({
     end
 })
 
-
-
+-- ==================================================
+-- TAB 3 (REMOVIDO)
+-- ==================================================
 
 -- ==================================================
--- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s)
+-- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s, TODOS EM ORDEM DE RARIDADE)
 -- ==================================================
-local Tab4 = Window:MakeTab({"baús", "map"})
+local Tab4 = Window:MakeTab({"Chests", "Farm"})
 local chestButtons = {}
+
+local chestNames = {
+    ["Item Chest"] = "Baú comun",
+    ["Item Chest1"] = "Baú de kk",
+    ["Item Chest2"] = "Baú de madeira",
+    ["Item Chest3"] = "Baú de ferro",
+    ["Item Chest4"] = "Baú de ouro"
+}
+
+local chestOrder = { "Item Chest", "Item Chest1", "Item Chest2", "Item Chest3", "Item Chest4" }
 
 local function encontrarChests()
     local chests = {}
     local itemsFolder = workspace:FindFirstChild("Items")
 
-    local chestNames = {
-        ["Item Chest"] = "Baú Normal",
-        ["Item Chest2"] = "Baú de ferro",
-        ["Item Chest3"] = "Baú de prata",
-        ["Item Chest4"] = "Baú de ouro"
-    }
-
     if itemsFolder then
-        for _, item in pairs(itemsFolder:GetChildren()) do
-            if chestNames[item.Name] then
-                local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    table.insert(chests, {
-                        Nome = chestNames[item.Name],
-                        Posicao = part.Position
-                    })
+        for _, chestName in ipairs(chestOrder) do
+            for _, item in ipairs(itemsFolder:GetChildren()) do
+                if item.Name == chestName then
+                    local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
+                    if part then
+                        table.insert(chests, {
+                            Nome = chestNames[chestName],
+                            Posicao = part.Position
+                        })
+                    end
                 end
             end
         end
@@ -180,3 +186,9 @@ task.spawn(function()
         task.wait(0.5)
     end
 end)
+
+-- ==================================================
+-- TAB 5 - ESP (VAZIO, FUTUROS PLANOS)
+-- ==================================================
+local Tab5 = Window:MakeTab({"ESP", "Visual"})
+Tab5:AddLabel("Funções ESP em breve...")
