@@ -123,11 +123,11 @@ local Tab4 = Window:MakeTab({"Chests", "Farm"})
 local chestButtons = {}
 
 local chestNames = {
-    ["Item Chest"] = "Baú comun",
-    ["Item Chest1"] = "Baú de kk",
-    ["Item Chest2"] = "Baú de madeira",
-    ["Item Chest3"] = "Baú de ferro",
-    ["Item Chest4"] = "Baú de ouro"
+    ["Item Chest"] = "Baú Normal",
+    ["Item Chest1"] = "Baú de Bronze",
+    ["Item Chest2"] = "Baú de Prata",
+    ["Item Chest3"] = "Baú de Ouro",
+    ["Item Chest4"] = "Baú de Rubi"
 }
 
 local chestOrder = { "Item Chest", "Item Chest1", "Item Chest2", "Item Chest3", "Item Chest4" }
@@ -188,7 +188,84 @@ task.spawn(function()
 end)
 
 -- ==================================================
--- TAB 5 - ESP (VAZIO, FUTUROS PLANOS)
+-- TAB 5 - ESP PARA BAÚS (CAIXA + NOME PEQUENO)
 -- ==================================================
 local Tab5 = Window:MakeTab({"ESP", "Visual"})
-Tab5:AddLabel("Funções ESP em breve...")
+local espEnabled = false
+local chestESP = {}
+
+Tab5:AddToggle({
+    Name = "ESP Baús",
+    Default = false,
+    Callback = function(v)
+        espEnabled = v
+
+        if not v then
+            for _, esp in pairs(chestESP) do
+                esp.Box:Destroy()
+                esp.Billboard:Destroy()
+            end
+            chestESP = {}
+        end
+    end
+})
+
+local function criarESP(obj, nome)
+    -- Caixa ao redor
+    local box = Instance.new("BoxHandleAdornment")
+    box.Adornee = obj
+    box.Size = obj.Size + Vector3.new(0.2, 0.2, 0.2)
+    box.Color3 = Color3.fromRGB(255, 215, 0)
+    box.Transparency = 0.3
+    box.ZIndex = 5
+    box.AlwaysOnTop = true
+    box.Parent = obj
+
+    -- Nome acima
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = obj
+    billboard.Size = UDim2.new(0, 100, 0, 20)
+    billboard.StudsOffset = Vector3.new(0, obj.Size.Y / 2 + 0.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = obj
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = nome
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextStrokeTransparency = 0
+    label.TextScaled = false
+    label.Font = Enum.Font.SourceSansBold
+    label.TextSize = 10
+    label.Parent = billboard
+
+    chestESP[obj] = {
+        Box = box,
+        Billboard = billboard
+    }
+end
+
+runService.Heartbeat:Connect(function()
+    if not espEnabled then return end
+
+    for obj, esp in pairs(chestESP) do
+        if not obj or not obj.Parent then
+            esp.Box:Destroy()
+            esp.Billboard:Destroy()
+            chestESP[obj] = nil
+        end
+    end
+
+    local itemsFolder = workspace:FindFirstChild("Items")
+    if itemsFolder then
+        for _, item in pairs(itemsFolder:GetChildren()) do
+            if chestNames[item.Name] then
+                local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
+                if part and not chestESP[part] then
+                    criarESP(part, chestNames[item.Name])
+                end
+            end
+        end
+    end
+end)
