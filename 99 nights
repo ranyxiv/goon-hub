@@ -26,12 +26,17 @@ local antiVoidEnabled = false
 local antiVoidHeight = -20
 local safeHeight = 30
 
+-- Fly Variables
+local flyEnabled = false
+local flySpeed = 50
+local flyBodyVelocity
+local flyBodyGyro
+
 -- ==================================================
 -- TAB 1 - PLAYER
 -- ==================================================
 local Tab1 = Window:MakeTab({"Player", "Cherry"})
 
--- Infinite Jump
 Tab1:AddToggle({
     Name = "Infinite Jump",
     Default = false,
@@ -44,7 +49,6 @@ uis.JumpRequest:Connect(function()
     end
 end)
 
--- WalkSpeed
 local function applySpeed(h)
     if h and h:IsA("Humanoid") then
         h.WalkSpeed = currentSpeed
@@ -71,49 +75,68 @@ Tab1:AddSlider({
     end
 })
 
--- NoClip
 Tab1:AddToggle({
     Name = "NoClip",
     Default = false,
     Callback = function(v) noclip = v end
 })
 
--- Anti-Void
 Tab1:AddToggle({
     Name = "Anti-Void",
     Default = false,
     Callback = function(v) antiVoidEnabled = v end
 })
 
--- RunService loop
-runService.Stepped:Connect(function()
-    if player.Character then
-        local h = player.Character:FindFirstChildOfClass("Humanoid")
-        if h and h.WalkSpeed ~= currentSpeed then
-            h.WalkSpeed = currentSpeed
-        end
+-- ==================================================
+-- Fly Direcional
+-- ==================================================
+Tab1:AddToggle({
+    Name = "Fly",
+    Default = false,
+    Callback = function(v)
+        flyEnabled = v
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hrp and humanoid then
+            if flyEnabled then
+                humanoid.PlatformStand = true
+                flyBodyVelocity = Instance.new("BodyVelocity")
+                flyBodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+                flyBodyVelocity.Velocity = Vector3.new(0,0,0)
+                flyBodyVelocity.Parent = hrp
 
-        -- NoClip
-        if noclip then
-            for _, part in pairs(player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-
-        -- Anti-Void
-        if antiVoidEnabled then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and hrp.Position.Y < antiVoidHeight then
-                hrp.CFrame = CFrame.new(hrp.Position.X, safeHeight, hrp.Position.Z)
+                flyBodyGyro = Instance.new("BodyGyro")
+                flyBodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+                flyBodyGyro.CFrame = hrp.CFrame
+                flyBodyGyro.Parent = hrp
+            else
+                humanoid.PlatformStand = false
+                if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity=nil end
+                if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro=nil end
             end
         end
     end
-end)
+})
+
+Tab1:AddSlider({
+    Name = "Fly Speed",
+    Min = 10,
+    Max = 200,
+    Increase = 1,
+    Default = 50,
+    Callback = function(v)
+        flySpeed = v
+    end
+})
 
 -- ==================================================
--- TAB 2 - TELEPORT FIXO
+-- TAB 2 - MAIN
+-- ==================================================
+local TabMain = Window:MakeTab({"Main", "Combat"})
+-- Atualmente sem sliders ou toggles de Range Aura
+
+-- ==================================================
+-- TAB 3 - TELEPORT FIXO
 -- ==================================================
 local Tab2 = Window:MakeTab({"Teleport","Map"})
 Tab2:AddButton({
@@ -196,14 +219,17 @@ task.spawn(function()
 end)
 
 -- ==================================================
--- TAB 5 - ESP MULTIPLOS ITENS (Baus, Cura, Combustível)
+-- TAB 5 - ESP MULTIPLOS ITENS
 -- ==================================================
 local Tab5 = Window:MakeTab({"ESP","Visual"})
 local espDistance = 10
 local espTypes = {
     Baus = { Names = {"Item Chest","Item Chest2","Item Chest3","Item Chest5","Item Chest6"}, Color=Color3.fromRGB(255,215,0) },
     Cura = { Names = {"Bandage","Medkit"}, Color=Color3.fromRGB(0,255,0) },
-    Combustivel = { Names = {"Coal","Fuel Canister","Oil Barrel"}, Color=Color3.fromRGB(255,140,0) }
+    Combustivel = { Names = {"Coal","Fuel Canister","Oil Barrel"}, Color=Color3.fromRGB(255,140,0) },
+    Bigorna = { Names = {"Anvil Back","Anvil Front","Anvil Base"}, Color=Color3.fromRGB(128,128,128) },
+    Armas = { Names = {"Rifle","Revolver"}, Color=Color3.fromRGB(0,128,255) },
+    Municao = { Names = {"Rifle Ammo","Revolver Ammo"}, Color=Color3.fromRGB(255,0,0) }
 }
 local itemsESP = {}
 
@@ -236,11 +262,10 @@ Tab5:AddSlider({
     end
 })
 
--- Função ESP ajustada: box contorna exatamente o objeto, texto menor
 local function criarESP(obj,nome,cor)
     local box = Instance.new("BoxHandleAdornment")
     box.Adornee = obj
-    box.Size = obj.Size -- box contorna exatamente o objeto
+    box.Size = obj.Size
     box.Color3 = cor
     box.Transparency = 0.3
     box.AlwaysOnTop = true
@@ -249,7 +274,7 @@ local function criarESP(obj,nome,cor)
 
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = obj
-    billboard.Size = UDim2.new(0,60,0,15) -- texto pequeno
+    billboard.Size = UDim2.new(0,60,0,15)
     billboard.StudsOffset = Vector3.new(0,obj.Size.Y/2 + 0.1,0)
     billboard.AlwaysOnTop = true
     billboard.Parent = obj
@@ -268,42 +293,88 @@ local function criarESP(obj,nome,cor)
     return { Box=box, Billboard=billboard }
 end
 
--- Atualização dinâmica dos ESPs
+-- ==================================================
+-- RUNSERVICE LOOP
+-- ==================================================
 runService.Heartbeat:Connect(function()
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = player.Character.HumanoidRootPart
     local itemsFolder = workspace:FindFirstChild("Items")
-    if not itemsFolder then return end
 
-    for typeName, info in pairs(espTypes) do
-        local espData = itemsESP[typeName]
-        if not espData.Enabled then continue end
+    -- ESPs
+    if itemsFolder then
+        for typeName, info in pairs(espTypes) do
+            local espData = itemsESP[typeName]
+            if not espData.Enabled then continue end
 
-        -- cria novos ESPs
-        for _, item in pairs(itemsFolder:GetChildren()) do
-            if table.find(info.Names,item.Name) then
-                local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
-                if part and not espData.Objects[part] then
-                    espData.Objects[part] = criarESP(part,item.Name,info.Color)
+            for _, item in pairs(itemsFolder:GetChildren()) do
+                if table.find(info.Names,item.Name) then
+                    local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
+                    if part and not espData.Objects[part] then
+                        espData.Objects[part] = criarESP(part,item.Name,info.Color)
+                    end
+                end
+            end
+
+            for obj, esp in pairs(espData.Objects) do
+                if not obj or not obj.Parent then
+                    esp.Box:Destroy()
+                    esp.Billboard:Destroy()
+                    espData.Objects[obj]=nil
+                else
+                    local distance = (hrp.Position - obj.Position).Magnitude
+                    if distance < espDistance then
+                        esp.Box.Transparency = 1
+                        esp.Billboard.Enabled = false
+                    else
+                        esp.Box.Transparency = 0.3
+                        esp.Billboard.Enabled = true
+                    end
+                end
+            end
+        end
+    end
+
+    -- Player RunService features
+    if player.Character then
+        local h = player.Character:FindFirstChildOfClass("Humanoid")
+        if h and h.WalkSpeed ~= currentSpeed then
+            h.WalkSpeed = currentSpeed
+        end
+
+        if noclip then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
             end
         end
 
-        -- atualiza e remove ESPs destruídos
-        for obj, esp in pairs(espData.Objects) do
-            if not obj or not obj.Parent then
-                esp.Box:Destroy()
-                esp.Billboard:Destroy()
-                espData.Objects[obj]=nil
-            else
-                local distance = (player.Character.HumanoidRootPart.Position - obj.Position).Magnitude
-                if distance < espDistance then
-                    esp.Box.Transparency = 1
-                    esp.Billboard.Enabled = false
-                else
-                    esp.Box.Transparency = 0.3
-                    esp.Billboard.Enabled = true
-                end
+        if antiVoidEnabled then
+            if hrp.Position.Y < -20 then
+                hrp.CFrame = CFrame.new(hrp.Position.X, 30, hrp.Position.Z)
             end
+        end
+
+        -- Fly movement
+        if flyEnabled and flyBodyVelocity and flyBodyGyro then
+            local moveVec = Vector3.new()
+            local camCFrame = workspace.CurrentCamera.CFrame
+
+            if uis:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + camCFrame.LookVector end
+            if uis:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec - camCFrame.LookVector end
+            if uis:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec - camCFrame.RightVector end
+            if uis:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + camCFrame.RightVector end
+            if uis:IsKeyDown(Enum.KeyCode.E) then moveVec = moveVec + Vector3.new(0,1,0) end
+            if uis:IsKeyDown(Enum.KeyCode.Q) then moveVec = moveVec - Vector3.new(0,1,0) end
+
+            if moveVec.Magnitude > 0 then
+                flyBodyVelocity.Velocity = moveVec.Unit * flySpeed
+            else
+                flyBodyVelocity.Velocity = Vector3.new(0,0,0)
+            end
+
+            flyBodyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + camCFrame.LookVector)
         end
     end
 end)
