@@ -14,11 +14,17 @@ Window:AddMinimizeButton({
 local player = game.Players.LocalPlayer
 local runService = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
 
--- Variáveis globais
+-- ==================================================
+-- PLAYER VARIABLES
+-- ==================================================
 local infJumpEnabled = false
 local noclip = false
 local currentSpeed = 16
+local antiVoidEnabled = false
+local antiVoidHeight = -20
+local safeHeight = 30
 
 -- ==================================================
 -- TAB 1 - PLAYER
@@ -29,11 +35,8 @@ local Tab1 = Window:MakeTab({"Player", "Cherry"})
 Tab1:AddToggle({
     Name = "Infinite Jump",
     Default = false,
-    Callback = function(v)
-        infJumpEnabled = v
-    end
+    Callback = function(v) infJumpEnabled = v end
 })
-
 uis.JumpRequest:Connect(function()
     if infJumpEnabled then
         local h = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -42,14 +45,14 @@ uis.JumpRequest:Connect(function()
 end)
 
 -- WalkSpeed
-local function applySpeed(humanoid)
-    if humanoid and humanoid:IsA("Humanoid") then
-        humanoid.WalkSpeed = currentSpeed
+local function applySpeed(h)
+    if h and h:IsA("Humanoid") then
+        h.WalkSpeed = currentSpeed
     end
 end
 
 player.CharacterAdded:Connect(function(char)
-    local h = char:WaitForChild("Humanoid", 5)
+    local h = char:WaitForChild("Humanoid",5)
     applySpeed(h)
 end)
 
@@ -64,85 +67,89 @@ Tab1:AddSlider({
     Increase = 1,
     Default = 20,
     Callback = function(Value)
-        currentSpeed = math.clamp(tonumber(Value) or 16, 1, 100)
+        currentSpeed = math.clamp(Value,1,100)
     end
 })
 
--- Força a velocidade sempre
+-- NoClip
+Tab1:AddToggle({
+    Name = "NoClip",
+    Default = false,
+    Callback = function(v) noclip = v end
+})
+
+-- Anti-Void
+Tab1:AddToggle({
+    Name = "Anti-Void",
+    Default = false,
+    Callback = function(v) antiVoidEnabled = v end
+})
+
+-- RunService loop
 runService.Stepped:Connect(function()
     if player.Character then
         local h = player.Character:FindFirstChildOfClass("Humanoid")
         if h and h.WalkSpeed ~= currentSpeed then
             h.WalkSpeed = currentSpeed
         end
-    end
-end)
 
--- NoClip
-runService.Stepped:Connect(function()
-    if noclip and player.Character then
-        for _, part in pairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
+        -- NoClip
+        if noclip then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+
+        -- Anti-Void
+        if antiVoidEnabled then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Position.Y < antiVoidHeight then
+                hrp.CFrame = CFrame.new(hrp.Position.X, safeHeight, hrp.Position.Z)
             end
         end
     end
 end)
 
-Tab1:AddToggle({
-    Name = "NoClip",
-    Default = false,
-    Callback = function(v)
-        noclip = v
-    end
-})
-
 -- ==================================================
 -- TAB 2 - TELEPORT FIXO
 -- ==================================================
-local Tab2 = Window:MakeTab({"Teleport", "Map"})
-
+local Tab2 = Window:MakeTab({"Teleport","Map"})
 Tab2:AddButton({
     Name = "TP para o Fogo",
     Callback = function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,0,0))
-            print("Teleportado para o Fogo: 0,0,0")
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(0,20,0))
         end
     end
 })
 
 -- ==================================================
--- TAB 3 (REMOVIDO)
+-- TAB 4 - TP PARA CHESTS
 -- ==================================================
-
--- ==================================================
--- TAB 4 - TP PARA CHESTS (AUTO REFRESH 0.5s, TODOS EM ORDEM DE RARIDADE)
--- ==================================================
-local Tab4 = Window:MakeTab({"Chests", "Farm"})
+local Tab4 = Window:MakeTab({"Chests","Farm"})
 local chestButtons = {}
-
 local chestNames = {
     ["Item Chest"] = "Baú Normal",
-    ["Item Chest1"] = "Baú de Bronze",
-    ["Item Chest2"] = "Baú de Prata",
-    ["Item Chest3"] = "Baú de Ouro",
-    ["Item Chest4"] = "Baú de Rubi"
+    ["Item Chest2"] = "Baú de Madeira",
+    ["Item Chest3"] = "Baú de Prata",
+    ["Item Chest5"] = "Baú de Ouro",
+    ["Item Chest6"] = "Baú de Rubi"
 }
-
-local chestOrder = { "Item Chest", "Item Chest1", "Item Chest2", "Item Chest3", "Item Chest4" }
+local chestOrder = {"Item Chest","Item Chest2","Item Chest3","Item Chest5","Item Chest6"}
 
 local function encontrarChests()
     local chests = {}
     local itemsFolder = workspace:FindFirstChild("Items")
-
     if itemsFolder then
         for _, chestName in ipairs(chestOrder) do
             for _, item in ipairs(itemsFolder:GetChildren()) do
                 if item.Name == chestName then
                     local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
                     if part then
-                        table.insert(chests, {
+                        table.insert(chests,{
+                            Instancia = part,
                             Nome = chestNames[chestName],
                             Posicao = part.Position
                         })
@@ -151,32 +158,33 @@ local function encontrarChests()
             end
         end
     end
-
     return chests
 end
 
-local function teleportarParaPosicao(posicao)
+local function teleportarParaPosicao(pos)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        player.Character.HumanoidRootPart.CFrame = CFrame.new(posicao + Vector3.new(0, 3, 0))
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
     end
 end
 
 local function atualizarChests()
-    for _, btn in pairs(chestButtons) do
-        btn:Remove()
-    end
-    chestButtons = {}
-
     local chests = encontrarChests()
-
     for _, chest in ipairs(chests) do
-        local btn = Tab4:AddButton({
-            Name = chest.Nome,
-            Callback = function()
-                teleportarParaPosicao(chest.Posicao)
-            end
-        })
-        table.insert(chestButtons, btn)
+        if not chestButtons[chest.Instancia] then
+            local btn = Tab4:AddButton({
+                Name = chest.Nome,
+                Callback = function()
+                    teleportarParaPosicao(chest.Posicao)
+                end
+            })
+            chestButtons[chest.Instancia] = btn
+        end
+    end
+    for inst, btn in pairs(chestButtons) do
+        if not inst or not inst.Parent then
+            btn:Remove()
+            chestButtons[inst] = nil
+        end
     end
 end
 
@@ -188,82 +196,112 @@ task.spawn(function()
 end)
 
 -- ==================================================
--- TAB 5 - ESP PARA BAÚS (CAIXA + NOME PEQUENO)
+-- TAB 5 - ESP MULTIPLOS ITENS (Baus, Cura, Combustível)
 -- ==================================================
-local Tab5 = Window:MakeTab({"ESP", "Visual"})
-local espEnabled = false
-local chestESP = {}
+local Tab5 = Window:MakeTab({"ESP","Visual"})
+local espDistance = 10
+local espTypes = {
+    Baus = { Names = {"Item Chest","Item Chest2","Item Chest3","Item Chest5","Item Chest6"}, Color=Color3.fromRGB(255,215,0) },
+    Cura = { Names = {"Bandage","Medkit"}, Color=Color3.fromRGB(0,255,0) },
+    Combustivel = { Names = {"Coal","Fuel Canister","Oil Barrel"}, Color=Color3.fromRGB(255,140,0) }
+}
+local itemsESP = {}
 
-Tab5:AddToggle({
-    Name = "ESP Baús",
-    Default = false,
-    Callback = function(v)
-        espEnabled = v
-
-        if not v then
-            for _, esp in pairs(chestESP) do
-                esp.Box:Destroy()
-                esp.Billboard:Destroy()
+for typeName, info in pairs(espTypes) do
+    itemsESP[typeName] = { Enabled=false, Objects={} }
+    Tab5:AddToggle({
+        Name = "ESP "..typeName,
+        Default=false,
+        Callback = function(v)
+            itemsESP[typeName].Enabled=v
+            if not v then
+                for _,esp in pairs(itemsESP[typeName].Objects) do
+                    esp.Box:Destroy()
+                    esp.Billboard:Destroy()
+                end
+                itemsESP[typeName].Objects = {}
             end
-            chestESP = {}
         end
+    })
+end
+
+Tab5:AddSlider({
+    Name = "Distância ESP",
+    Min=1,
+    Max=50,
+    Increase=1,
+    Default=10,
+    Callback=function(value)
+        espDistance = value
     end
 })
 
-local function criarESP(obj, nome)
-    -- Caixa ao redor
+-- Função ESP ajustada: box contorna exatamente o objeto, texto menor
+local function criarESP(obj,nome,cor)
     local box = Instance.new("BoxHandleAdornment")
     box.Adornee = obj
-    box.Size = obj.Size + Vector3.new(0.2, 0.2, 0.2)
-    box.Color3 = Color3.fromRGB(255, 215, 0)
+    box.Size = obj.Size -- box contorna exatamente o objeto
+    box.Color3 = cor
     box.Transparency = 0.3
-    box.ZIndex = 5
     box.AlwaysOnTop = true
+    box.ZIndex = 5
     box.Parent = obj
 
-    -- Nome acima
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = obj
-    billboard.Size = UDim2.new(0, 100, 0, 20)
-    billboard.StudsOffset = Vector3.new(0, obj.Size.Y / 2 + 0.5, 0)
+    billboard.Size = UDim2.new(0,60,0,15) -- texto pequeno
+    billboard.StudsOffset = Vector3.new(0,obj.Size.Y/2 + 0.1,0)
     billboard.AlwaysOnTop = true
     billboard.Parent = obj
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Size = UDim2.new(1,0,1,0)
     label.BackgroundTransparency = 1
     label.Text = nome
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextColor3 = Color3.fromRGB(255,255,255)
     label.TextStrokeTransparency = 0
-    label.TextScaled = false
+    label.TextScaled = true
     label.Font = Enum.Font.SourceSansBold
-    label.TextSize = 10
+    label.TextSize = 8
     label.Parent = billboard
 
-    chestESP[obj] = {
-        Box = box,
-        Billboard = billboard
-    }
+    return { Box=box, Billboard=billboard }
 end
 
+-- Atualização dinâmica dos ESPs
 runService.Heartbeat:Connect(function()
-    if not espEnabled then return end
-
-    for obj, esp in pairs(chestESP) do
-        if not obj or not obj.Parent then
-            esp.Box:Destroy()
-            esp.Billboard:Destroy()
-            chestESP[obj] = nil
-        end
-    end
-
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
     local itemsFolder = workspace:FindFirstChild("Items")
-    if itemsFolder then
+    if not itemsFolder then return end
+
+    for typeName, info in pairs(espTypes) do
+        local espData = itemsESP[typeName]
+        if not espData.Enabled then continue end
+
+        -- cria novos ESPs
         for _, item in pairs(itemsFolder:GetChildren()) do
-            if chestNames[item.Name] then
+            if table.find(info.Names,item.Name) then
                 local part = item:IsA("BasePart") and item or item:FindFirstChildWhichIsA("BasePart")
-                if part and not chestESP[part] then
-                    criarESP(part, chestNames[item.Name])
+                if part and not espData.Objects[part] then
+                    espData.Objects[part] = criarESP(part,item.Name,info.Color)
+                end
+            end
+        end
+
+        -- atualiza e remove ESPs destruídos
+        for obj, esp in pairs(espData.Objects) do
+            if not obj or not obj.Parent then
+                esp.Box:Destroy()
+                esp.Billboard:Destroy()
+                espData.Objects[obj]=nil
+            else
+                local distance = (player.Character.HumanoidRootPart.Position - obj.Position).Magnitude
+                if distance < espDistance then
+                    esp.Box.Transparency = 1
+                    esp.Billboard.Enabled = false
+                else
+                    esp.Box.Transparency = 0.3
+                    esp.Billboard.Enabled = true
                 end
             end
         end
